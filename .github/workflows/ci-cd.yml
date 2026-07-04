@@ -1,0 +1,53 @@
+name: CI/CD pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout source
+      uses: actions/checkout@v3
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+
+    - name: Docker login
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Build Docker image
+      run: docker build -t ${{ secrets.DOCKER_USERNAME }}/demo11-flask-app:latest .
+
+    - name: Run Container by using image
+      run: docker run -d -p 5000:5000 ${{ secrets.DOCKER_USERNAME }}/demo11-flask-app:latest
+
+    - name: Trivy vulnerability scan
+      uses: aquasecurity/trivy-action@0.12.0
+      with:
+        scan-type: 'fs'
+        path: '.'
+        severity: 'HIGH,CRITICAL'
+
+    - name: SAST with CodeQL
+      uses: github/codeql-action/init@v2
+      with:
+        languages: python
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v2
+
+    - name: SCA with Dependency Review
+      uses: actions/dependency-review-action@v3
+
+    - name: DAST with OWASP ZAP baseline scan
+      uses: zaproxy/action-baseline@v0.7.0
+      with:
+        target: 'http://localhost:5000'
+
+    - name: Push Docker image
+      run: docker push ${{ secrets.DOCKER_USERNAME }}/demo11-flask-app:latest
