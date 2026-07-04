@@ -28,7 +28,7 @@ jobs:
       run: docker run -d -p 5000:5000 ${{ secrets.DOCKER_USERNAME }}/demo11-flask-app:latest
 
     - name: Trivy vulnerability scan
-      uses: aquasecurity/trivy-action@0.20.0
+      uses: aquasecurity/trivy-action@v0.36.0
       with:
         scan-type: 'fs'
         path: '.'
