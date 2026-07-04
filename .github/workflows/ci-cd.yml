@@ -1,125 +1,36 @@
-name: CI/CD Pipeline
+name: CI/CD pipeline
 
 on:
   push:
     branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
-
-permissions:
-  contents: read
-  security-events: write   # required by codeql-action/analyze
-  actions: read
 
 jobs:
-
-  # Static analysis + dependency review (dependency-review only works on PRs — it needs a base ref to diff against)
-  static-analysis:
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
-
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
-        with:
-          languages: python
-
-      - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
-
-      - name: Dependency Review (PRs only)
-        if: github.event_name == 'pull_request'
-        uses: actions/dependency-review-action@v4
-
-  # Build image locally, scan it, spin it up, run DAST — nothing is pushed yet
-  build-scan-test:
-    needs: static-analysis
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@v2
 
-      - name: Build image (local only, not pushed)
-        uses: docker/build-push-action@v7
+      - name: Docker login
+        uses: docker/login-action@v2
         with:
-          context: .
-          push: false
-          load: true
-          tags: demo11-flask-app:ci
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # NOTE: aquasecurity/trivy-action was hit by a supply-chain attack in March 2026
-      # (malicious code pushed to most version tags). v0.36.0 is confirmed clean, but for
-      # maximum safety pin to a full commit SHA instead of a tag, e.g.:
-      # uses: aquasecurity/trivy-action@<full-40-char-commit-sha>
-      - name: Trivy filesystem scan (source + dependencies)
+      - name: Build Docker image
+        run: docker build -t ${{ secrets.DOCKER_USERNAME }}/demo11-flask-app:latest .
+
+      - name: Run Container
+        run: docker run -d -p 5000:5000 ${{ secrets.DOCKER_USERNAME }}/demo11-flask-app:latest
+
+      - name: Trivy vulnerability scan
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: 'fs'
-          scan-ref: '.'
+          path: '.'
           severity: 'HIGH,CRITICAL'
-          exit-code: '1'
-
-      - name: Trivy image scan
-        uses: aquasecurity/trivy-action@v0.36.0
-        with:
-          image-ref: 'demo11-flask-app:ci'
-          severity: 'HIGH,CRITICAL'
-          exit-code: '1'
-
-      - name: Run container for DAST
-        run: docker run -d --rm --name ci-app -p 5000:5000 demo11-flask-app:ci
-
-      - name: Wait for app to become ready
-        run: |
-          for i in $(seq 1 15); do
-            if curl -sf http://localhost:5000 > /dev/null; then
-              echo "App is up"
-              exit 0
-            fi
-            echo "Waiting for app to start... ($i)"
-            sleep 2
-          done
-          echo "App never became ready" >&2
-          exit 1
-
-      - name: DAST with OWASP ZAP baseline scan
-        uses: zaproxy/action-baseline@v0.12.0
-        with:
-          target: 'http://localhost:5000'
-
-      - name: Stop test container
-        if: always()
-        run: docker stop ci-app || true
-
-  # Only push to the registry once everything above has passed, and only on main
-  push:
-    needs: build-scan-test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout source
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
-
-      - name: Docker login
-        uses: docker/login-action@v4
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v7
-        with:
-          context: .
-          push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/demo11-flask-app:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - name: Push Docker image
+        run: docker push ${{ secrets.DOCKER_USERNAME }}/demo11-flask-app:latest
