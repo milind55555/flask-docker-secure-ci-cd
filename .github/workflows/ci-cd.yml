@@ -24,6 +24,24 @@ jobs:
       - name: Build Docker image
         run: docker build -t ${{ secrets.DOCKER_USERNAME }}/demo11-flask-app:latest .
 
+      # 🔍 Trivy filesystem scan (checks code & dependencies)
+      - name: Trivy FS scan
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          scan-type: fs
+          path: .
+          format: table
+          severity: HIGH,CRITICAL
+
+      # 🔍 Trivy image scan (checks built image)
+      - name: Trivy Image scan
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          scan-type: image
+          image-ref: ${{ secrets.DOCKER_USERNAME }}/demo11-flask-app:latest
+          format: table
+          severity: HIGH,CRITICAL
+
       - name: Run Container
         run: docker run -d -p 5001:5000 ${{ secrets.DOCKER_USERNAME }}/demo11-flask-app:latest
 
