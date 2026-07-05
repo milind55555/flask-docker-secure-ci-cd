@@ -5,25 +5,24 @@ WORKDIR /app
 
 COPY requirements.txt .
 
-RUN pip install --user -r requirements.txt
+# Install dependencies system-wide (not --user)
+RUN pip install --prefix=/install -r requirements.txt
 
-#Build final stage
+# Build final stage
 FROM python:3.11-slim AS production
 
+# Create non-root user
 RUN useradd -m flaskuser
 
 WORKDIR /app
 
-COPY --from=builder /root/.local /root/.local
-ENV PATH=/root/.local/bin:$PATH
+# Copy installed packages from builder
+COPY --from=builder /install /usr/local
 
-
+# Copy application code
 COPY . .
+
 USER flaskuser
 
-CMD ["python","app.py"]
 EXPOSE 5000
-
-
-
-
+CMD ["python", "app.py"]
