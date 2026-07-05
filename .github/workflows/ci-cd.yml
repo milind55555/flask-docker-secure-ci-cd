@@ -2,7 +2,8 @@ name: CI/CD pipeline
 
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - "main"
 
 jobs:
   build:
@@ -17,8 +18,8 @@ jobs:
       - name: Docker login
         uses: docker/login-action@v2
         with:
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build Docker image
         run: docker build -t ${{ secrets.DOCKER_USERNAME }}/demo11-flask-app:latest .
@@ -26,6 +27,5 @@ jobs:
       - name: Run Container
         run: docker run -d -p 5001:5000 ${{ secrets.DOCKER_USERNAME }}/demo11-flask-app:latest
 
-      
       - name: Push Docker image
         run: docker push ${{ secrets.DOCKER_USERNAME }}/demo11-flask-app:latest
