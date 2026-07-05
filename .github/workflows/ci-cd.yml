@@ -24,7 +24,7 @@ jobs:
         run: docker build -t ${{ secrets.DOCKER_USERNAME }}/demo11-flask-app:latest .
 
       - name: Run Container
-        run: docker run -d -p 5000:5000 ${{ secrets.DOCKER_USERNAME }}/demo11-flask-app:latest
+        run: docker run -d -p 5001:5000 ${{ secrets.DOCKER_USERNAME }}/demo11-flask-app:latest
 
       
       - name: Push Docker image
